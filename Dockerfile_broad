@@ -1,0 +1,277 @@
+#JENKINS expects this file to be copied as Dockerfile to the root of the repo when Jenkins job is run for building
+FROM ubuntu:14.04
+
+## Not supported by docker-compose
+
+ARG GITHUB_TAG
+ARG GITHUB_DIR=tags/
+
+#### Basic image utilities
+RUN apt-get update && \
+     apt-get upgrade -y && \
+     apt-get install -y python && \
+     apt-get install -y python3-pip && \
+     apt-get install -y wget curl unzip gcc python-dev python-setuptools git less lynx hdfview
+##########
+
+# Install some more useful tools
+RUN apt-get install -y \
+ aufs-tools \
+ automake \
+ bedtools \
+ btrfs-tools \
+ build-essential \
+ dpkg-sig \
+ iptables \
+ samtools \
+ software-properties-common
+
+#### Specific for google cloud support
+RUN wget https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.zip \
+    && unzip google-cloud-sdk.zip \
+    && rm google-cloud-sdk.zip
+
+RUN google-cloud-sdk/install.sh --usage-reporting=true --path-update=true --bash-completion=true --rc-path=/.bashrc --disable-installation-options
+VOLUME ["/root/.config"]
+ENV PATH /google-cloud-sdk/bin:$PATH
+
+RUN yes | gcloud components update
+RUN yes | gcloud components update preview
+###########
+
+# Set environment variables.
+ENV HOME /root
+
+# Define working directory.
+WORKDIR /root
+
+# Define default command.
+CMD ["bash"]
+
+# Installing Java 8.... dockerfile snippet from https://github.com/dockerfile/java/blob/master/oracle-java8/Dockerfile
+RUN \
+  echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | debconf-set-selections && \
+  add-apt-repository -y ppa:webupd8team/java && \
+  apt-get update && \
+  apt-get install -y oracle-java8-installer && \
+  rm -rf /var/lib/apt/lists/* && \
+  rm -rf /var/cache/oracle-jdk8-installer
+
+# Define commonly used JAVA_HOME variable
+ENV JAVA_HOME /usr/lib/jvm/java-8-oracle
+ENV JAVA_LIBRARY_PATH /usr/lib/jni
+
+# Added from GATK4 public (Getting R setup)
+RUN mkdir -p /usr/local/lib/R/ && \
+    mkdir -p ~/site-library && \
+    ln -sFv ~/site-library /usr/local/lib/R/site-library
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9 && \
+    add-apt-repository "deb http://cran.rstudio.com/bin/linux/ubuntu trusty/" && \
+    apt-get update && \
+    apt-get install -y --force-yes \
+        r-base-dev=3.1.3-1trusty \
+        r-base-core=3.1.3-1trusty
+
+# R setup complete...
+
+# Installing GATK4 protected (from repo: gatk-protected)
+#  This Dockerfile is getting the specified tag of gatk4-protected
+#  This Dockerfile generates a jar file that will work without spark or in spark standalone.  Not on a spark cluster.
+
+# Install R dependencies and build the shadowJar
+ENV GITHUB_TAG ${GITHUB_TAG}
+ENV GITHUB_DIR ${GITHUB_DIR}
+RUN mkdir -p /root/gatk-protected/
+COPY . /root/gatk-protected/
+WORKDIR /root/gatk-protected/
+RUN Rscript /root/gatk-protected/scripts/install_R_packages.R
+RUN ./gradlew clean compileTestJava shadowJar
+
+WORKDIR /root
+
+# Make sure we can see a help message
+RUN ln -sFv /root/gatk-protected/build/libs/gatk-protected.jar
+RUN java -jar gatk-protected.jar -h
+
+# Install git lfs and get latest big files
+WORKDIR /root/gatk-protected/
+RUN bash scripts/install_git_lfs.sh
+
+RUN echo This docker image is running gatk-protected `git describe --tags` > /root/GATK_PROTECTED_VERSION
+
+# Create a simple unit test runner
+ENV CI true
+RUN echo "cd /root/gatk-protected/ && ./gradlew test" >/root/run_unit_tests.sh
+
+WORKDIR /root
+################################################################################
+################################################################################
+################################################################################
+################################################################################
+#################################################################
+# Dockerfile
+#
+# Version:          1
+# Software:         GATK
+# Software Version: 3.4
+# Description:      The Genome Analysis Toolkit or GATK is a software package developed at the Broad Institute to analyze high-throughput sequencing data.
+# Website:          https://www.broadinstitute.org/gatk/|https://github.com/broadgsa/gatk-protected/
+# Tags:             Genomics
+# Provides:         gatk 3.4|samtools 1.2|bwakit 0.7.12|picard tools 1.139
+# Base Image:       java:7
+# Build Cmd:        docker build --rm -t biodckrdev/gatk 3.4/.
+# Pull Cmd:         docker pull biodckrdev/gatk
+# Run Cmd:          docker run --rm -it biodckrdev/gatk <options> <files>
+#################################################################
+#SOURCE: https://github.com/giantswarm/giantswarm-gatk/blob/master/Dockerfile
+# Source Image
+FROM java:7
+
+# Set noninterative mode
+ENV DEBIAN_FRONTEND noninteractive
+
+################## BEGIN INSTALLATION ######################
+#
+# Change to root
+#
+USER root
+
+
+
+#
+# INSTALL MAVEN
+#
+RUN apt-get update -qq && \
+    apt-get install -y -q --fix-missing \
+      libncurses5-dev  \
+      libncursesw5-dev \
+      build-essential \
+      bzip2 \
+      zlib1g-dev \
+      maven && \
+    apt-get clean && \
+    apt-get purge && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    mkdir /data /config
+
+
+
+#
+# INSTALL SAMTOOLS
+#
+ENV ZIP=samtools-1.2.tar.bz2
+ENV URL=https://github.com/BioDocker/software-archive/releases/download/samtools
+ENV FOLDER=samtools-1.2
+ENV DST=/tmp
+
+RUN wget $URL/$ZIP -O $DST/$ZIP && \
+    tar xvf $DST/$ZIP -C $DST && \
+    rm $DST/$ZIP && \
+    cd $DST/$FOLDER && \
+    make && \
+    make install && \
+    cd / && \
+    rm -rf $DST/$FOLDER
+
+
+
+#
+# Add biodocker user with password biodocker
+#
+RUN useradd --create-home --shell /bin/bash --user-group --uid 1000 --groups sudo biodocker && \
+    echo `echo "biodocker\nbiodocker\n" | passwd biodocker`
+
+
+
+#
+# Change user
+#
+USER biodocker
+
+
+
+#
+# Create $HOME/bin folder
+#
+RUN mkdir -p /home/biodocker/bin
+
+
+
+#
+# Add $HOME/bin to path
+#
+ENV PATH=$PATH:/home/biodocker/bin
+ENV HOME=/home/biodocker
+
+
+
+#
+# INSTALL BWA
+#
+ENV ZIP=bwakit-0.7.12_x64-linux.tar.bz2
+ENV URL=https://github.com/BioDocker/software-archive/releases/download/bwa
+ENV FOLDER=bwa.kit
+ENV DST=/home/biodocker/bin
+
+RUN wget $URL/$ZIP -O $DST/$ZIP && \
+    tar xvf $DST/$ZIP --strip-components=1 -C $DST && \
+    rm $DST/$ZIP
+
+
+#
+# INSTALL PICARD
+#
+ENV ZIP=picard-tools-1.139.zip
+ENV URL=https://github.com/broadinstitute/picard/releases/download/1.139/
+ENV FOLDER=picard-tools-1.139
+ENV DST=/home/biodocker/bin/
+
+RUN wget $URL/$ZIP -O $DST/$ZIP && \
+    unzip $DST/$ZIP -d $DST && \
+    rm $DST/$ZIP && \
+    cd $DST/$FOLDER && \
+    mv * .. && \
+    cd / && \
+    bash -c 'echo -e "#!/bin/bash\njava -jar '$DST'/picard.jar \$@" > '$DST'/picard' && \
+    chmod +x $DST/picard && \
+    rm -rf $DST/$FOLDER
+
+
+
+#
+# INSTALL GATK
+#
+# download and build GATK from current master
+ENV SHA=f19618653a0d23baaf147efe7f14aeb4eeb0cbb8
+
+ENV DST=/home/biodocker/bin
+ENV FOLDER=gatk
+
+RUN git clone https://github.com/broadgsa/gatk-protected.git $DST/$FOLDER && \
+    cd $DST/$FOLDER && \
+    git reset --hard $SHA && \
+    mvn verify && \
+    bash -c 'echo -e "#!/bin/bash\njava -jar '$DST/$FOLDER'/target/GenomeAnalysisTK.jar  \$@" > '$DST'/GenomeAnalysisTK' && \
+    chmod +x $DST/GenomeAnalysisTK
+
+ENV PATH=/usr/lib/jvm/java-7-openjdk-amd64/bin:$PATH
+
+#ENV JAVABIN=/usr/lib/jvm/java-7-openjdk-amd64/bin/java
+#ENTRYPOINT ["java", "-jar", "$DST/target/GenomeAnalysisTK.jar"]
+
+
+
+#
+# Share default volumes
+#
+VOLUME ["/data", "/config"]
+
+
+
+CMD ["GenomeAnalysisTK"]
+
+##################### INSTALLATION END #####################
+
+# File Author / Maintainer
+MAINTAINER Saulo Alves Aflitos <sauloal@gmail.com>
+
