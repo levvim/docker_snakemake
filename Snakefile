@@ -1,22 +1,24 @@
-#Snakefile to test snakemake engine functionality (create, move, run different files)
+#Snakefile to test snakemake engine functionality (create, move, run different samples)
 
 FILE = "/home/PROJECT/"
-FILES = "1 2 3 4 5 6 7 8 9 10".split()
+FILES = "1 2 3 4 5".split()
 
 rule all:
-        input: expand("{files}.sorted.txt", files=FILES)
+        input: expand(FILE + "complete/{samples}.sorted.txt", samples=FILES)
 
-rule create:
-        input: FILE + "raw/{files}.txt"
-        output: FILE + "complete/{files}.sorted.txt"
+rule test:
+        input: FILE + 'raw/{samples}.txt'
+        output: FILE + '{samples}.sorted.txt'
         shell:
                 "printf 'numero {input}' > {output}"
-#
-#rule move:
-#       input: "{filename}.txt"
-#       shell: "mv {input} ../{input}"
-#rule test:
-#       input: '1.txt'
-#       output: '1.sorted.txt'
-#       shell: "printf 'numero {input}' > {output}"
+
+rule create:
+        input: FILE + "raw/{samples}.txt"
+        output: FILE + "complete/{samples}.sorted.txt"
+        shell:
+                "printf 'numero {input}' > {output}"
+
+rule move:
+        input: "{filename}.txt"
+        shell: "mv {input} ../{input}"
 
