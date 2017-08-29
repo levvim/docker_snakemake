@@ -1,6 +1,7 @@
-# docker-snakemake
+# docker_snakemake
 
-## Basic framework to implement Snakemake pipelines in a docker container. 
+### Basic framework to implement Snakemake pipelines in a docker container. 
+
 
 We create a ubuntu machine with the /home/user/ directory that contains pipeline scripts/log files and a /home/user/PROJECT/ directory that contains the files used in analysis including intermediary steps stored in seperate folders.
 
