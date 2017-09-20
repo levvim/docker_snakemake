@@ -8,20 +8,20 @@ RUN apt-get install -y wget git
 RUN easy_install3 snakemake
 
 # clone the most recent version of the pipeline and create project directories
-WORKDIR /home/user/
+WORKDIR /
 ARG CACHEBUST=1 #to avoid git cache
-RUN git clone https://github.com/levvim/docker_snakemake.git /home/user && \
+RUN git clone https://github.com/levvim/docker_snakemake.git /docker_snakemake && \
         mkdir PROJECT && \
         cd PROJECT && \
         mkdir raw complete
 
 # download the input files into the project directory
-WORKDIR /home/user/PROJECT/raw/
-RUN for i in 1 2 3 4 5; do echo "sample $i" > "$i".txt; done
+RUN cd /PROJECT/raw/ \
+    && for i in 1 2 3 4 5; do echo "sample $i" > "$i".txt; done
 
 # list filetree before execution
-WORKDIR /home/user/
+WORKDIR /
 RUN ls -alR | grep ":$" | sed -e 's/:$//' -e 's/[^-][^\/]*\//--/g' -e 's/^/   /' -e 's/-/|/'
 
 # Execute the pipeline
-RUN snakemake -d /home/user/PROJECT/ --snakefile /home/user/Snakefile
+RUN snakemake -d /PROJECT/ --snakefile /docker_snakemake/Snakefile
