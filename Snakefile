@@ -1,6 +1,6 @@
 #Snakefile to test snakemake engine functionality (create, move, run different samples)
 
-FILE = "/home/PROJECT/"
+FILE = "/PROJECT/"
 FILES = "1 2 3 4 5".split()
 
 rule all:
