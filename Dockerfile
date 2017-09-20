@@ -9,7 +9,7 @@ RUN easy_install3 snakemake
 
 # clone the most recent version of the pipeline and create project directories
 WORKDIR /
-ARG CACHEBUST=1 #to avoid git cache
+
 RUN git clone https://github.com/levvim/docker_snakemake.git /docker_snakemake && \
         mkdir PROJECT && \
         cd PROJECT && \
