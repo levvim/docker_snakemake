@@ -11,8 +11,10 @@ To run, first clone the repo and get the Dockerfile.
     git clone https://github.com/levvim/docker_snakemake.git .
 
 Build the dockerfile, which will execute the snakemake engine.
+
     docker build . -t snakemake -f Dockerfile
     docker build . -t snakemake -f Dockerfile --build-arg CACHEBUST=$(date +%s) #to avoid cache of git files
 
 Alternatively you can run the single command to build from repo.
+
     docker build https://github.com/levvim/docker_snakemake.git -t snakemake
