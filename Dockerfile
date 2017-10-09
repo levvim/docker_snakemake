@@ -24,4 +24,4 @@ WORKDIR /
 RUN ls -alR | grep ":$" | sed -e 's/:$//' -e 's/[^-][^\/]*\//--/g' -e 's/^/   /' -e 's/-/|/' > filetree_origin.txt
 
 # Execute the pipeline
-RUN snakemake -d /PROJECT/ --snakefile /docker_snakemake/Snakefile
+RUN snakemake -d /PROJECT/ --snakefile /docker_snakemake/Snakefile --config samples="1 2"

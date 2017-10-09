@@ -1,7 +1,7 @@
 #Snakefile to test snakemake engine functionality (create, move, run different samples)
 
 FILE = "/PROJECT/"
-FILES = "1 2 3 4 5".split()
+FILES = config["samples"].split()
 
 rule all:
         input: expand(FILE + "complete/{samples}.sorted.txt", samples=FILES)
